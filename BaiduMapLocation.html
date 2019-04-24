@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <meta name="viewport" content="initial-scale=1.0, user-scalable=no"/>
+  <style type="text/css">
+    body, html {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      font-family: "微软雅黑";
+    }
+
+    #allmap {
+      width: 100%;
+      height: 500px;
+    }
+
+    p {
+      margin-left: 5px;
+      font-size: 14px;
+    }
+  </style>
+  <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=key"></script>
+  <script src="http://libs.baidu.com/jquery/1.9.0/jquery.js"></script>
+  <title>给多个点添加信息窗口</title>
+</head>
+<body>
+<div id="allmap"></div>
+<p>点击标注点，可查看由纯文本构成的简单型信息窗口</p>
+</body>
+</html>
+<script type="text/javascript">
+
+  var bPoints = [];  // 百度坐标系坐标(地图中需要使用这个)
+  var myPoint = new BMap.Point(104.071773, 30.558866);
+
+  map = new BMap.Map("allmap");  // 百度地图API功能
+  map.centerAndZoom(myPoint, 15);  // 定位地图中心为工作地点
+
+  //后台数据, 一些待标记的地图点(经纬坐标系)
+  var data_info = [
+    [104.073408, 30.649419],
+    [104.215987, 30.511624],
+    // [104.07251, 30.591948],
+    // [104.035284, 30.591202],
+    // [104.007113, 30.546301],
+    // [104.107005, 30.681686],
+  ];
+  //信息窗口样式
+  var opts = {
+    width: 250,     // 信息窗口宽度
+    height: 80,     // 信息窗口高度
+    title: "<p style='color: red;'>信息窗口</p>", // 信息窗口标题
+    enableMessage: true//设置允许信息窗发送短息
+  };
+  addMarker(data_info);
+  map.addOverlay(new BMap.Marker(myPoint)); // 创建标注, 并添加到地图里
+
+  /**
+   * 创建标注点并添加到地图中
+   * bPoints.push(point); // 添加到百度坐标数组 用于自动调整缩放级别
+   * @param data_info
+   *
+   */
+  function addMarker(data_info) {
+    for (var i = 0; i < data_info.length; i++) {
+      var point = new BMap.Point(data_info[i][0], data_info[i][1]); // 将标注点坐标转化成地图上的点
+      map.addOverlay(new BMap.Marker(point)); // 创建标注, 并添加到地图里
+      bPoints.push(point);
+    }
+  }
+
+
+  /**
+   * 根据距离自己最近的点 自动调整地图缩放比例
+   * 思路: 1. 寻找最近的点 p1
+   *      2. 以自己为中心，计算最近点的中心对称的点 p2
+   *      3. 根据 p1, p2 计算获得 view 视图
+   *      4. 获取 view.center, view.zoom
+   *      5. 调用: map.centerAndZoom(view.center, view.zoom)
+   * @param myPoint
+   * @param bPoints
+   */
+  function adjustZoomWithNearest(myPoint, bPoints) {
+    var idx = getNearest(myPoint, bPoints);  // 寻找最近的点
+    var newPoint = getCentrosymmetricPoint(myPoint, bPoints[idx]);
+    var view = map.getViewport(eval([bPoints[idx], newPoint]));
+    map.centerAndZoom(view.center, view.zoom);
+  }
+
+  /**
+   * 寻找最近的点的下标
+   * @param myPoint  center point
+   * @param bPoints  marker point list
+   * @returns {number}
+   */
+  function getNearest(myPoint, bPoints) {
+    var index = 0;  // 距离 center point 最近的点的下标
+    var minDistance = getDistance(myPoint, bPoints[0]);
+    for (var i = 1; i < bPoints.length; i++) {
+      var distance = getDistance(myPoint, bPoints[i]);
+      if (distance >= minDistance) continue;
+      minDistance = distance;
+      index = i;
+    }
+    return index;
+  }
+
+  /**
+   * 计算两坐标点间距离(经纬坐标系计算)
+   * @param point1
+   * @param point2
+   * @returns {number}
+   */
+  function getDistance(point1, point2) {
+    var radLat1 = point1.lat * Math.PI / 180.0;
+    var radLat2 = point2.lat * Math.PI / 180.0;
+    var a = radLat1 - radLat2;
+    var b = point1.lng * Math.PI / 180.0 - point2.lng * Math.PI / 180.0;
+    var s = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin(a / 2), 2) +
+      Math.cos(radLat1) * Math.cos(radLat2) * Math.pow(Math.sin(b / 2), 2)));
+    s = s * 6378.137;// EARTH_RADIUS;
+    return s;
+  }
+
+  /**
+   * 根据锚点获得对应点的中心对称点（利用Pixel计算）
+   * @param anchor  锚点
+   * @param point   待计算点
+   * @returns  BMap.Point instance
+   */
+  function getCentrosymmetricPoint(anchor, point) {
+    var p_anchor = map.pointToOverlayPixel(anchor);
+    var p_point = map.pointToOverlayPixel(point);
+    var dx = p_anchor.x - p_point.x;
+    var dy = p_anchor.y - p_point.y;
+    var pixel = new BMap.Pixel(p_anchor.x + dx, p_anchor.y + dy);
+    return map.overlayPixelToPoint(pixel);
+  }
+
+
+  map.addControl(new BMap.MapTypeControl());
+  map.enableScrollWheelZoom(true);
+
+  setTimeout(function () {
+    // setZoom(bPoints);
+    adjustZoomWithNearest(myPoint, bPoints);
+  }, 1000);
+
+</script>
