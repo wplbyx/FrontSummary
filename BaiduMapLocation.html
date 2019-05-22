@@ -107,6 +107,8 @@
     return index;
   }
 
+ 
+
   /**
    * 计算两坐标点间距离(经纬坐标系计算)
    * @param point1
@@ -122,6 +124,21 @@
       Math.cos(radLat1) * Math.cos(radLat2) * Math.pow(Math.sin(b / 2), 2)));
     s = s * 6378.137;// EARTH_RADIUS;
     return s;
+  }
+  
+  /**
+   * 排序 vue.school 列表，根据与 myPoint 点之间的距离大小排序
+   * @param myPoint  center point
+   * @returns {null}
+   */
+  function sortNearest (myPoint) {
+    for (let i = 0; i < this.schools.length; i++) {
+      this.schools[i]['distance'] = this.getDistance(myPoint, this.schools[i]['b_point'])
+    }
+    // 根据距离由小到大排序
+    this.schools.sort((a, b) => {
+      return a.distance - b.distance
+    })
   }
 
   /**
